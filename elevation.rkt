@@ -1,11 +1,14 @@
 #lang racket
 
-(provide elevation-rasters)
+(provide elevation-rasters
+         elevation-service-start)
 
 (require pict)
 (require json)
 (require net/url)
 (require file/unzip)
+(require file/convertible)
+(require (planet dmac/spin))
 
 ;; (: SRTM String Real Real Real Real)
 (struct SRTM (file-name min-long min-lat max-long max-lat) #:transparent)
@@ -34,9 +37,12 @@
                                    "/"
                                    (SRTM-file-name srtm)
                                    ".tif ")])
-       (system (string-append "cp -f "
-                              geotiff
-                              "data/")))))
+       (begin
+         (system "mkdir -p data/")
+         (system (string-append "cp -f "
+                                geotiff
+                                "data/"))))))
+
 
 ;; (: SRTM-download (-> SRTM Void))
 (define (SRTM-download srtm)
@@ -114,7 +120,8 @@
                              "data/"
                              (SRTM-file-name srtm)
                              "_cropped.bmp"))
-      (bitmap (string-append (SRTM-file-name srtm)
+      (bitmap (string-append "data/"
+                             (SRTM-file-name srtm)
                              "_cropped.bmp")))))
 
 ;; (: elevation-rasters (-> Real Real Real Real (Listof Bitmap)))
@@ -123,3 +130,17 @@
           (SRTM-intersection srtm min-long min-lat max-long max-lat))
        (filter (SRTM-intersects? min-long min-lat max-long max-lat)
                SRTMs)))
+
+;; (: elevation-service-start (-> Void))
+(define (elevation-service-start)
+  (begin
+    (get "/"
+         (λ (req)
+            (let ([reply (bytes->string/latin-1 (convert (first (elevation-rasters (string->number (params req 'minlong))
+                                                                                   (string->number (params req 'minlat))
+                                                                                   (string->number (params req 'maxlong))
+                                                                                   (string->number (params req 'maxlat))))
+                                                         'png-bytes))])
+              (define h (header #"Content-Type" #"image/png"))
+              (quasiquote (201 (,h) (unquote reply))))))
+    (run)))
