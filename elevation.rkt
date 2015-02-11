@@ -8,6 +8,7 @@
 (require net/url)
 (require file/unzip)
 (require file/convertible)
+(require web-server/servlet)
 (require (planet dmac/spin))
 
 ;; (: SRTM String Real Real Real Real)
@@ -67,11 +68,11 @@
 
 ;; (: SRTM-intersection (-> SRTM Real Real Real Real Bitmap))
 (define (SRTM-intersection srtm min-long min-lat max-long max-lat)
-  (let ([target-resolution (/ 0.000833333333333 90)]
+  (let ([target-resolution 0.0008333333333] ;; divide by 90
         [interpolation-method "cubicspline"]
         [scale-min 0]
         [scale-max 2200]
-        [out-size 129])
+        [out-size 4097])
     (begin
       (SRTM-download srtm)
       (system (string-append "rm -f "
@@ -103,7 +104,9 @@
                              "data/"
                              (SRTM-file-name srtm)
                              "_cropped.tif"))
-      (system (string-append "gdal_translate -q -ot Byte -of BMP "
+      (system (string-append "gdal_translate "
+                             "-q "
+                             "-ot Byte -of BMP "
                              "-scale "
                              (number->string scale-min)
                              " "
@@ -133,14 +136,21 @@
 
 ;; (: elevation-service-start (-> Void))
 (define (elevation-service-start)
+  (define (bitmap-response-maker status headers body)
+    (response status
+              (status->message status)
+              (current-seconds)
+              #"image/png"
+              headers
+              (λ (op)
+                 (write-bytes (convert body 'png-bytes) op))))
+  (define (bitmap-get path handler)
+    (define-handler "GET" path handler bitmap-response-maker))
   (begin
-    (get "/"
-         (λ (req)
-            (let ([reply (bytes->string/latin-1 (convert (first (elevation-rasters (string->number (params req 'minlong))
-                                                                                   (string->number (params req 'minlat))
-                                                                                   (string->number (params req 'maxlong))
-                                                                                   (string->number (params req 'maxlat))))
-                                                         'png-bytes))])
-              (define h (header #"Content-Type" #"image/png"))
-              (quasiquote (201 (,h) (unquote reply))))))
+    (bitmap-get "/"
+                (λ (req)
+                   (first (elevation-rasters (string->number (params req 'minlong))
+                                             (string->number (params req 'minlat))
+                                             (string->number (params req 'maxlong))
+                                             (string->number (params req 'maxlat))))))
     (run)))
