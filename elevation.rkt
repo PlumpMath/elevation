@@ -104,7 +104,7 @@
       (system (string-append "rm -f "
                              data-dir
                              file-name-prefix
-                             "_cropped.tif"))
+                             "cropped.tif"))
       (system (string-append "gdalwarp "
                              "-q "
                              "-r "
@@ -129,7 +129,7 @@
                              ".tif "
                              data-dir
                              file-name-prefix
-                             "_cropped.tif"))
+                             "cropped.tif"))
       (system (string-append "gdal_translate "
                              "-q "
                              "-ot Byte -of BMP "
@@ -140,13 +140,13 @@
                              " "
                              data-dir
                              file-name-prefix
-                             "_cropped.tif "
+                             "cropped.tif "
                              data-dir
                              file-name-prefix
-                             "_cropped.bmp"))
+                             "cropped.bmp"))
       (bitmap (string-append data-dir
                              file-name-prefix
-                             "_cropped.bmp")))))
+                             "cropped.bmp")))))
 
 ;; (: elevation-raster (-> Real Real Real Real Bitmap))
 (define (elevation-raster min-long min-lat max-long max-lat)
@@ -173,3 +173,4 @@
                                              (string->number (params req 'maxlong))
                                              (string->number (params req 'maxlat)))))
     (run)))
+
