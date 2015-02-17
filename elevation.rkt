@@ -17,9 +17,10 @@
 
 ;; (: data-dir String)
 (define data-dir
-  (begin
-    (system "mkdir -p ./data/")
-    "./data/"))
+  (let ([path "/tmp/data/"])
+    (begin
+      (system (string-append  "mkdir -p " path))
+      path)))
 
 ;; (: SRTM String Real Real Real Real)
 (struct SRTM (file-name min-long min-lat max-long max-lat) #:transparent)
