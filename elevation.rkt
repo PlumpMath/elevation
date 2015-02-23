@@ -14,6 +14,8 @@
 (require file/convertible)
 (require web-server/servlet)
 (require (planet dmac/spin))
+(require "gdalinfo.rkt")
+(require "trenches.rkt")
 
 ;; (: data-dir String)
 (define data-dir
@@ -82,7 +84,7 @@
                                  ""
                                  srtms)]
         [target-resolution (/ 0.0008333333333 90)] ;; 1 metre resolution
-        [interpolation-method "cubicspline"]
+        [interpolation-method "near"]
         [scale-min 0]
         [scale-max 256])
     (begin
@@ -144,6 +146,14 @@
                              data-dir
                              file-name-prefix
                              "cropped.bmp"))
+      (write-json
+        (gdalinfo->jsexpr
+          (string->gdalinfo
+            (with-output-to-string
+              (λ () (system (string-append "gdalinfo "
+                                           data-dir
+                                           file-name-prefix
+                                           "cropped.tif")))))))
       (bitmap (string-append data-dir
                              file-name-prefix
                              "cropped.bmp")))))
@@ -163,14 +173,29 @@
               headers
               (λ (op)
                  (write-bytes (convert body 'png-bytes) op))))
+  (define (json-response-maker status headers body)
+    (response status
+             (status->message status)
+             (current-seconds)
+             #"text/json"
+             headers
+             (λ (op)
+                (write-json body op))))
   (define (bitmap-get path handler)
     (define-handler "GET" path handler bitmap-response-maker))
+  (define (json-get path handler)
+    (define-handler "GET" path handler json-response-maker))
   (begin
     (bitmap-get "/"
                 (λ (req)
                    (elevation-raster (string->number (params req 'minlong))
-                                             (string->number (params req 'minlat))
-                                             (string->number (params req 'maxlong))
-                                             (string->number (params req 'maxlat)))))
+                                     (string->number (params req 'minlat))
+                                     (string->number (params req 'maxlong))
+                                     (string->number (params req 'maxlat)))))
     (run)))
+
+;; Entry point:
+;; $ racket elevation.rkt
+(module+ main
+  (elevation-service-start))
 
