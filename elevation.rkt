@@ -75,7 +75,7 @@
     (call-with-unzip (get-pure-port url #:redirections 1)
                      geotiff-copy)))
 
-;; (: SRTM-intersection (-> (Listof SRTM) Real Real Real Real Bitmap))
+;; (: SRTM-intersection (-> (Listof SRTM) Real Real Real Real String))
 (define (SRTM-intersection srtms min-long min-lat max-long max-lat)
   (let ([file-name-prefix (foldl (λ (srtm str)
                                     (string-append (SRTM-file-name srtm)
@@ -84,81 +84,95 @@
                                  ""
                                  srtms)]
         [target-resolution (/ 0.0008333333333 90)] ;; 1 metre resolution
-        [interpolation-method "near"]
+        [interpolation-method "cubicspline"]
         [scale-min 0]
         [scale-max 256])
     (begin
-      (map SRTM-download srtms)
-      (system (string-append "gdal_merge.py "
-                             "-q "
-                             "-of GTiff "
-                             "-o "
-                             data-dir
-                             file-name-prefix
-                             ".tif "
-                             (foldl (λ (srtm str)
-                                       (string-append data-dir
-                                                      (SRTM-file-name srtm)
-                                                      ".tif "
-                                                      str))
-                                    ""
-                                    srtms)))
-      (system (string-append "rm -f "
-                             data-dir
-                             file-name-prefix
-                             "cropped.tif"))
-      (system (string-append "gdalwarp "
-                             "-q "
-                             "-r "
-                             interpolation-method
-                             " "
-                             "-tr "
-                             (number->string target-resolution)
-                             " "
-                             (number->string (* -1 target-resolution))
-                             " "
-                             "-te "
-                             (number->string min-long)
-                             " "
-                             (number->string min-lat)
-                             " "
-                             (number->string max-long)
-                             " "
-                             (number->string max-lat)
-                             " "
-                             data-dir
-                             file-name-prefix
-                             ".tif "
-                             data-dir
-                             file-name-prefix
-                             "cropped.tif"))
-      (system (string-append "gdal_translate "
-                             "-q "
-                             "-ot Byte -of BMP "
-                             "-scale "
-                             (number->string scale-min)
-                             " "
-                             (number->string scale-max)
-                             " "
-                             data-dir
-                             file-name-prefix
-                             "cropped.tif "
-                             data-dir
-                             file-name-prefix
-                             "cropped.bmp"))
-      (write-json
-        (gdalinfo->jsexpr
-          (string->gdalinfo
-            (with-output-to-string
-              (λ () (system (string-append "gdalinfo "
-                                           data-dir
-                                           file-name-prefix
-                                           "cropped.tif")))))))
-      (bitmap (string-append data-dir
-                             file-name-prefix
-                             "cropped.bmp")))))
+      (printf "Downloading ~a tiles of elevation data.\n"
+              (length srtms))
+      (for/list ([srtm srtms])
+                (begin (printf "Downloading ~s.\n"
+                               (SRTM-file-name srtm))
+                       (time
+                         (unless (file-exists? (string-append data-dir
+                                                              (SRTM-file-name srtm)
+                                                              ".tif"))
+                           (SRTM-download srtm)))))
+      (printf "Merging tiles together.\n")
+      (time (system (string-append "gdal_merge.py "
+                                   "-q "
+                                   "-of GTiff "
+                                   "-o "
+                                   data-dir
+                                   file-name-prefix
+                                   ".tif "
+                                   (foldl (λ (srtm str)
+                                             (string-append data-dir
+                                                            (SRTM-file-name srtm)
+                                                            ".tif "
+                                                            str))
+                                          ""
+                                          srtms))))
+      (printf "Removing old cropped/merged GeoTiff file.\n")
+      (time (system (string-append "rm -f "
+                                   data-dir
+                                   file-name-prefix
+                                   "cropped.tif")))
+      (printf "Cropping GeoTiff file.\n")
+      (time (system (string-append "gdalwarp "
+                                   "-q "
+                                   "-r "
+                                   interpolation-method
+                                   " "
+                                   "-tr "
+                                   (number->string target-resolution)
+                                   " "
+                                   (number->string (* -1 target-resolution))
+                                   " "
+                                   "-te "
+                                   (number->string min-long)
+                                   " "
+                                   (number->string min-lat)
+                                   " "
+                                   (number->string max-long)
+                                   " "
+                                   (number->string max-lat)
+                                   " "
+                                   data-dir
+                                   file-name-prefix
+                                   ".tif "
+                                   data-dir
+                                   file-name-prefix
+                                   "cropped.tif")))
+      (printf "Translating GeoTiff file.\n")
+      (time (system (string-append "gdal_translate "
+                                   "-q "
+                                   "-ot UInt16 -of PNG "
+                                   "-scale "
+                                   (number->string scale-min)
+                                   " "
+                                   (number->string scale-max)
+                                   " "
+                                   data-dir
+                                   file-name-prefix
+                                   "cropped.tif "
+                                   data-dir
+                                   file-name-prefix
+                                   "cropped.png")))
+      (string-append data-dir
+                     file-name-prefix
+                     "cropped.png"))))
 
-;; (: elevation-raster (-> Real Real Real Real Bitmap))
+;; (: print-gdal-info (-> String Void))
+(define (print-gdal-info file-path)
+  (write-json
+    (gdalinfo->jsexpr
+      (string->gdalinfo
+        (with-output-to-string
+          (λ () (system (string-append "gdalinfo "
+                                       file-path))))))))
+
+;; (: elevation-raster (-> Real Real Real Real String))
 (define (elevation-raster min-long min-lat max-long max-lat)
   (let ([srtms (filter (SRTM-intersects? min-long min-lat max-long max-lat) SRTMs)])
     (SRTM-intersection srtms min-long min-lat max-long max-lat)))
@@ -172,7 +186,10 @@
               #"image/png"
               headers
               (λ (op)
-                 (write-bytes (convert body 'png-bytes) op))))
+                 (begin
+                   (with-input-from-file body
+                                         (λ () (copy-port (current-input-port) op)))
+                   (void)))))
   (define (json-response-maker status headers body)
     (response status
              (status->message status)
