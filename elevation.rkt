@@ -83,7 +83,7 @@
                                                    str))
                                  ""
                                  srtms)]
-        [target-resolution (/ 0.0008333333333 90)] ;; 1 metre resolution
+        [target-resolution (/ 0.0008333333333 1)] ;; 1 metre resolution
         [interpolation-method "cubicspline"]
         [scale-min 0]
         [scale-max 256])
@@ -147,12 +147,12 @@
       (printf "Translating GeoTiff file.\n")
       (time (system (string-append "gdal_translate "
                                    "-q "
-                                   "-ot UInt16 -of PNG "
-                                   "-scale "
-                                   (number->string scale-min)
-                                   " "
-                                   (number->string scale-max)
-                                   " "
+                                   "-ot Byte -of PNG "
+                                   ;;"-scale "
+                                   ;;(number->string scale-min)
+                                   ;;" "
+                                   ;;(number->string scale-max)
+                                   ;;" "
                                    data-dir
                                    file-name-prefix
                                    "cropped.tif "
