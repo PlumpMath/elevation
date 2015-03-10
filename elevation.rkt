@@ -14,8 +14,6 @@
 (require file/convertible)
 (require web-server/servlet)
 (require (planet dmac/spin))
-(require "gdalinfo.rkt")
-(require "trenches.rkt")
 
 ;; (: data-dir String)
 (define data-dir
@@ -83,11 +81,9 @@
                                                    str))
                                  ""
                                  srtms)]
-        [target-resolution (/ 0.0008333333333 1)] ;; 1 metre resolution
-        [interpolation-method "cubicspline"]
-        [scale-min 0]
-        [scale-max 256])
+        [interpolation-method "bilinear"])
     (begin
+      (printf "\n")
       (printf "Downloading ~a tiles of elevation data.\n"
               (length srtms))
       (for/list ([srtm srtms])
@@ -124,11 +120,6 @@
                                    "-r "
                                    interpolation-method
                                    " "
-                                   "-tr "
-                                   (number->string target-resolution)
-                                   " "
-                                   (number->string (* -1 target-resolution))
-                                   " "
                                    "-te "
                                    (number->string min-long)
                                    " "
@@ -144,33 +135,29 @@
                                    data-dir
                                    file-name-prefix
                                    "cropped.tif")))
-      (printf "Translating GeoTiff file.\n")
-      (time (system (string-append "gdal_translate "
+       (printf "Translating GeoTiff file to PNG.\n")
+       (time (system (string-append "gdal_translate "
                                    "-q "
                                    "-ot Byte -of PNG "
-                                   ;;"-scale "
-                                   ;;(number->string scale-min)
-                                   ;;" "
-                                   ;;(number->string scale-max)
-                                   ;;" "
                                    data-dir
                                    file-name-prefix
                                    "cropped.tif "
                                    data-dir
                                    file-name-prefix
                                    "cropped.png")))
+      (printf "Translating GeoTiff file to XYZ.\n")
+      (time (system (string-append "gdal_translate "
+                                   ""
+                                   "-of XYZ "
+                                   data-dir
+                                   file-name-prefix
+                                   "cropped.tif "
+                                   data-dir
+                                   file-name-prefix
+                                   "cropped.xyz")))
       (string-append data-dir
                      file-name-prefix
-                     "cropped.png"))))
-
-;; (: print-gdal-info (-> String Void))
-(define (print-gdal-info file-path)
-  (write-json
-    (gdalinfo->jsexpr
-      (string->gdalinfo
-        (with-output-to-string
-          (λ () (system (string-append "gdalinfo "
-                                       file-path))))))))
+                     "cropped"))))
 
 ;; (: elevation-raster (-> Real Real Real Real String))
 (define (elevation-raster min-long min-lat max-long max-lat)
@@ -179,36 +166,37 @@
 
 ;; (: elevation-service-start (-> Void))
 (define (elevation-service-start)
-  (define (bitmap-response-maker status headers body)
-    (response status
-              (status->message status)
-              (current-seconds)
-              #"image/png"
-              headers
-              (λ (op)
-                 (begin
-                   (with-input-from-file body
-                                         (λ () (copy-port (current-input-port) op)))
-                   (void)))))
-  (define (json-response-maker status headers body)
-    (response status
-             (status->message status)
-             (current-seconds)
-             #"text/json"
-             headers
-             (λ (op)
-                (write-json body op))))
-  (define (bitmap-get path handler)
-    (define-handler "GET" path handler bitmap-response-maker))
-  (define (json-get path handler)
-    (define-handler "GET" path handler json-response-maker))
+  (define (file-response-maker mime-type)
+    (λ (status headers body)
+       (response status
+                 (status->message status)
+                 (current-seconds)
+                 mime-type
+                 headers
+                 (λ (op)
+                    (begin
+                      (with-input-from-file body
+                                            (λ () (copy-port (current-input-port) op)))
+                      (void))))))
+  (define (file-get path handler mime-type)
+    (define-handler "GET" path handler (file-response-maker mime-type)))
   (begin
-    (bitmap-get "/"
-                (λ (req)
-                   (elevation-raster (string->number (params req 'minlong))
-                                     (string->number (params req 'minlat))
-                                     (string->number (params req 'maxlong))
-                                     (string->number (params req 'maxlat)))))
+    (file-get "/"
+              (λ (req)
+                 (string-append (elevation-raster (string->number (params req 'minlong))
+                                                  (string->number (params req 'minlat))
+                                                  (string->number (params req 'maxlong))
+                                                  (string->number (params req 'maxlat)))
+                                ".png"))
+              #"image/png")
+    (file-get "/xyz"
+              (λ (req)
+                 (string-append (elevation-raster (string->number (params req 'minlong))
+                                                  (string->number (params req 'minlat))
+                                                  (string->number (params req 'maxlong))
+                                                  (string->number (params req 'maxlat)))
+                                ".xyz"))
+              #"text/plain")
     (run)))
 
 ;; Entry point:
