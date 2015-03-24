@@ -4,7 +4,7 @@
 ;; * Python 2.7.5
 ;; * GDAL
 
-(provide elevation-raster
+(provide SRTM-inside
          elevation-service-start)
 
 (require pict)
@@ -73,15 +73,43 @@
     (call-with-unzip (get-pure-port url #:redirections 1)
                      geotiff-copy)))
 
-;; (: SRTM-intersection (-> (Listof SRTM) Real Real Real Real String))
+;; (: SRTM->png-file (-> SRTM String))
+(define (SRTM->png-file srtm)
+  (let ([file-name-prefix (list->string (drop (string->list (SRTM-file-name srtm)) 4))])
+    (begin
+      (printf "Translating GeoTiff file to PNG.\n")
+      (time (system (string-append "gdal_translate "
+                                   "-q "
+                                   "-ot Byte -of PNG "
+                                   file-name-prefix
+                                   ".tif "
+                                   file-name-prefix
+                                   ".png")))
+      (string-append file-name-prefix ".png"))))
+
+;; (: SRTM->xyz-file (-> SRTM String))
+(define (SRTM->xyz-file srtm)
+  (let ([file-name-prefix (list->string (drop (string->list (SRTM-file-name srtm)) 4))])
+    (begin
+      (printf "Translating GeoTiff file to XYZ.\n")
+      (time (system (string-append "gdal_translate "
+                                   ""
+                                   "-of XYZ "
+                                   file-name-prefix
+                                   ".tif "
+                                   file-name-prefix
+                                   ".xyz")))
+      (string-append file-name-prefix ".xyz"))))
+
+;; (: SRTM-intersection (-> (Listof SRTM) Real Real Real Real SRTM))
 (define (SRTM-intersection srtms min-long min-lat max-long max-lat)
-  (let ([file-name-prefix (foldl (λ (srtm str)
-                                    (string-append (SRTM-file-name srtm)
-                                                   "_"
-                                                   str))
-                                 ""
-                                 srtms)]
-        [interpolation-method "bilinear"])
+  (let* ([file-name-prefix (foldl (λ (srtm str)
+                                     (string-append (SRTM-file-name srtm)
+                                                    "_"
+                                                    str))
+                                  ""
+                                  srtms)]
+         [interpolation-method "bilinear"])
     (begin
       (printf "\n")
       (printf "Downloading ~a tiles of elevation data.\n"
@@ -117,6 +145,7 @@
       (printf "Cropping GeoTiff file.\n")
       (time (system (string-append "gdalwarp "
                                    "-q "
+                                   " "
                                    "-r "
                                    interpolation-method
                                    " "
@@ -135,32 +164,11 @@
                                    data-dir
                                    file-name-prefix
                                    "cropped.tif")))
-       (printf "Translating GeoTiff file to PNG.\n")
-       (time (system (string-append "gdal_translate "
-                                   "-q "
-                                   "-ot Byte -of PNG "
-                                   data-dir
-                                   file-name-prefix
-                                   "cropped.tif "
-                                   data-dir
-                                   file-name-prefix
-                                   "cropped.png")))
-      (printf "Translating GeoTiff file to XYZ.\n")
-      (time (system (string-append "gdal_translate "
-                                   ""
-                                   "-of XYZ "
-                                   data-dir
-                                   file-name-prefix
-                                   "cropped.tif "
-                                   data-dir
-                                   file-name-prefix
-                                   "cropped.xyz")))
-      (string-append data-dir
-                     file-name-prefix
-                     "cropped"))))
+      (SRTM (string-append data-dir file-name-prefix "cropped.tif")
+            min-long min-lat max-long max-lat))))
 
-;; (: elevation-raster (-> Real Real Real Real String))
-(define (elevation-raster min-long min-lat max-long max-lat)
+;; (: SRTM-inside (-> Real Real Real Real SRTM))
+(define (SRTM-inside min-long min-lat max-long max-lat)
   (let ([srtms (filter (SRTM-intersects? min-long min-lat max-long max-lat) SRTMs)])
     (SRTM-intersection srtms min-long min-lat max-long max-lat)))
 
@@ -183,19 +191,19 @@
   (begin
     (file-get "/"
               (λ (req)
-                 (string-append (elevation-raster (string->number (params req 'minlong))
-                                                  (string->number (params req 'minlat))
-                                                  (string->number (params req 'maxlong))
-                                                  (string->number (params req 'maxlat)))
-                                ".png"))
+                 (SRTM->png-file
+                   (SRTM-inside (string->number (params req 'minlong))
+                                (string->number (params req 'minlat))
+                                (string->number (params req 'maxlong))
+                                (string->number (params req 'maxlat)))))
               #"image/png")
     (file-get "/xyz"
               (λ (req)
-                 (string-append (elevation-raster (string->number (params req 'minlong))
-                                                  (string->number (params req 'minlat))
-                                                  (string->number (params req 'maxlong))
-                                                  (string->number (params req 'maxlat)))
-                                ".xyz"))
+                 (SRTM->xyz-file
+                   (SRTM-inside (string->number (params req 'minlong))
+                                (string->number (params req 'minlat))
+                                (string->number (params req 'maxlong))
+                                (string->number (params req 'maxlat)))))
               #"text/plain")
     (run)))
 
