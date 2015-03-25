@@ -111,7 +111,15 @@
                                (SRTM-max-long srtm)))
                          (* 0.5
                             (+ (SRTM-min-lat srtm)
-                               (SRTM-max-lat srtm))))])
+                               (SRTM-max-lat srtm))))]
+         [utm-min (utm (SRTM-min-long srtm)
+                       (SRTM-min-lat  srtm))]
+         [utm-max (utm (SRTM-max-long srtm)
+                       (SRTM-max-lat  srtm))]
+         [utm-min-x (vector-ref utm-min 0)]
+         [utm-min-y (vector-ref utm-min 1)]
+         [utm-max-x (vector-ref utm-max 0)]
+         [utm-max-y (vector-ref utm-max 1)])
     (begin
       (printf "UTM-projecting GeoTiff file.~n")
       (printf "Calculated UTM zone: ~a~n" zone)
@@ -136,11 +144,7 @@
                                    " "
                                    "+ellps=WGS84"
                                    "\"")))
-      (SRTM new-file-name
-            (SRTM-min-long srtm)
-            (SRTM-min-lat  srtm)
-            (SRTM-max-long srtm)
-            (SRTM-max-lat  srtm)))))
+      (SRTM new-file-name utm-min-x utm-min-y utm-max-x utm-max-y))))
 
 ;; (: SRTM-intersection (-> (Listof SRTM) Real Real Real Real SRTM))
 (define (SRTM-intersection srtms min-long min-lat max-long max-lat)
