@@ -14,7 +14,8 @@
 (require file/convertible)
 (require web-server/servlet)
 (require (planet dmac/spin))
-(require data/utm)
+(require muninn/utm)
+(require muninn/trenches)
 
 ;; (: data-dir String)
 (define data-dir
