@@ -24,8 +24,18 @@
       (system (string-append  "mkdir -p " path))
       path)))
 
+;; (: utm-scale-x Real)
+(define utm-scale-x 1.0)
+
+;; (: utm-scale-y Real)
+(define utm-scale-y -1.0)
+
 ;; (: SRTM String Real Real Real Real)
 (struct SRTM (file-name min-long min-lat max-long max-lat) #:transparent)
+
+;; (: uid (-> String))
+(define (uid)
+  (path->string (make-temporary-file "srtm-~a" #f data-dir)))
 
 ;; (: SRTMs (Listof SRTM))
 (define SRTMs
@@ -77,36 +87,37 @@
 
 ;; (: SRTM->png-file (-> SRTM String))
 (define (SRTM->png-file srtm)
-  (let ([file-name-prefix (list->string (drop-right (string->list (SRTM-file-name srtm)) 4))])
+  (let ([new-file-name (uid)])
     (begin
-      (printf "Translating GeoTiff file to PNG.\n")
+      (printf "Translating GeoTiff file to PNG.~n")
       (time (system (string-append "gdal_translate "
                                    "-q "
                                    "-ot Byte -of PNG "
-                                   file-name-prefix
-                                   ".tif "
-                                   file-name-prefix
-                                   ".png")))
-      (string-append file-name-prefix ".png"))))
+                                   (SRTM-file-name srtm)
+                                   " "
+                                   new-file-name)))
+      (printf "Saved \"~a\".~n" new-file-name)
+      new-file-name)))
 
 ;; (: SRTM->xyz-file (-> SRTM String))
 (define (SRTM->xyz-file srtm)
-  (let ([file-name-prefix (list->string (drop-right (string->list (SRTM-file-name srtm)) 4))])
+  (let ([new-file-name (uid)])
     (begin
-      (printf "Translating GeoTiff file to XYZ.\n")
+      (printf "Translating GeoTiff file to XYZ.~n")
       (time (system (string-append "gdal_translate"
                                    " "
+                                   "-q"
+                                   " "
                                    "-of XYZ "
-                                   file-name-prefix
-                                   ".tif "
-                                   file-name-prefix
-                                   ".xyz")))
-      (string-append file-name-prefix ".xyz"))))
+                                   (SRTM-file-name srtm)
+                                   " "
+                                   new-file-name)))
+      (printf "Saved \"~a\".~n" new-file-name)
+      new-file-name)))
 
 ;; (: SRTM-utm-project (-> SRTM SRTM))
 (define (SRTM-utm-project srtm)
-  (let* ([file-name-prefix (list->string (drop-right (string->list (SRTM-file-name srtm)) 4))]
-         [new-file-name (string-append file-name-prefix "_utm.tif")]
+  (let* ([new-file-name (uid)]
          [zone (utm-zone (* 0.5
                             (+ (SRTM-min-long srtm)
                                (SRTM-max-long srtm)))
@@ -124,10 +135,6 @@
     (begin
       (printf "UTM-projecting GeoTiff file.~n")
       (printf "Calculated UTM zone: ~a~n" zone)
-      (when (file-exists? new-file-name)
-        (begin
-          (printf "Removing old UTM-projected GeoTiff file.~n")
-          (time (system (string-append "rm -f " new-file-name)))))
       (time (system (string-append "gdalwarp"
                                    " "
                                    (SRTM-file-name srtm)
@@ -144,17 +151,22 @@
                                    (number->string zone)
                                    " "
                                    "+ellps=WGS84"
-                                   "\"")))
+                                   "\""
+                                   " "
+                                   "-tr"
+                                   " "
+                                   (number->string utm-scale-x)
+                                   " "
+                                   (number->string utm-scale-y)
+                                   " "
+                                   "-r bilinear")))
+      (printf "Saved \"~a\".~n" new-file-name)
       (SRTM new-file-name utm-min-x utm-min-y utm-max-x utm-max-y))))
 
 ;; (: SRTM-intersection (-> (Listof SRTM) Real Real Real Real SRTM))
 (define (SRTM-intersection srtms min-long min-lat max-long max-lat)
-  (let* ([file-name-prefix (foldl (λ (srtm str)
-                                     (string-append (SRTM-file-name srtm)
-                                                    "_"
-                                                    str))
-                                  ""
-                                  srtms)]
+  (let* ([file-name-merged (uid)]
+         [file-name-cropped (uid)]
          [interpolation-method "bilinear"])
     (begin
       (printf "\n")
@@ -173,9 +185,8 @@
                                    "-q "
                                    "-of GTiff "
                                    "-o "
-                                   data-dir
-                                   file-name-prefix
-                                   ".tif "
+                                   file-name-merged
+                                   " "
                                    (foldl (λ (srtm str)
                                              (string-append data-dir
                                                             (SRTM-file-name srtm)
@@ -183,11 +194,7 @@
                                                             str))
                                           ""
                                           srtms))))
-      (printf "Removing old cropped/merged GeoTiff file.\n")
-      (time (system (string-append "rm -f "
-                                   data-dir
-                                   file-name-prefix
-                                   "cropped.tif")))
+      (printf "Saved \"~a\".~n" file-name-merged)
       (printf "Cropping GeoTiff file.\n")
       (time (system (string-append "gdalwarp "
                                    "-q "
@@ -204,14 +211,11 @@
                                    " "
                                    (number->string max-lat)
                                    " "
-                                   data-dir
-                                   file-name-prefix
-                                   ".tif "
-                                   data-dir
-                                   file-name-prefix
-                                   "cropped.tif")))
-      (SRTM (string-append data-dir file-name-prefix "cropped.tif")
-            min-long min-lat max-long max-lat))))
+                                   file-name-merged
+                                   " "
+                                   file-name-cropped)))
+      (printf "Saved \"~a\".~n" file-name-cropped)
+      (SRTM file-name-cropped min-long min-lat max-long max-lat))))
 
 ;; (: SRTM-inside (-> Real Real Real Real SRTM))
 (define (SRTM-inside min-long min-lat max-long max-lat)
@@ -234,6 +238,16 @@
                       (void))))))
   (define (file-get path handler mime-type)
     (define-handler "GET" path handler (file-response-maker mime-type)))
+  (define (bitmap-response-maker status headers body)
+    (response status
+              (status->message status)
+              (current-seconds)
+              #"image/png"
+              headers
+              (λ (op)
+                 (write-bytes (convert body 'png-bytes) op))))
+  (define (bitmap-get path handler)
+    (define-handler "GET" path handler bitmap-response-maker))
   (begin
     (file-get "/"
               (λ (req)
@@ -260,6 +274,19 @@
                                   (string->number (params req 'maxlong))
                                   (string->number (params req 'maxlat))))))
               #"image/png")
+    (bitmap-get "/utm/trenches"
+                (λ (req)
+                   (begin
+                     (printf "~nRequesting trench data in (~a, ~a, ~a, ~a)~n"
+                             (params req 'minlong)
+                             (params req 'minlat)
+                             (params req 'maxlong)
+                             (params req 'maxlat))
+                     (pict->bitmap
+                       (plot-trenches (trenches (string->number (params req 'minlong))
+                                                (string->number (params req 'minlat))
+                                                (string->number (params req 'maxlong))
+                                                (string->number (params req 'maxlat))))))))
     (run)))
 
 ;; Entry point:
