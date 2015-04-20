@@ -1,9 +1,5 @@
 #lang racket
 
-;; Prereqs:
-;; * Python 2.7.5
-;; * GDAL 1.11.1
-
 (provide SRTM-inside
          elevation-service-start)
 
