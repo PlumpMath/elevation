@@ -20,11 +20,14 @@
       (system (string-append  "mkdir -p " path))
       path)))
 
+;; (: scale-factor Real)
+(define scale-factor 1.0)
+
 ;; (: utm-scale-x Real)
-(define utm-scale-x 1.0)
+(define utm-scale-x (/ 1.0 scale-factor))
 
 ;; (: utm-scale-y Real)
-(define utm-scale-y -1.0)
+(define utm-scale-y (/ -1.0 scale-factor))
 
 ;; (: SRTM String Real Real Real Real)
 (struct SRTM (file-name min-long min-lat max-long max-lat) #:transparent)
@@ -273,16 +276,17 @@
     (bitmap-get "/utm/trenches"
                 (λ (req)
                    (begin
-                     (printf "~nRequesting trench data in (~a, ~a, ~a, ~a)~n"
+                     (printf "~nRequesting trench data in (~a,~a,~a,~a)~n"
                              (params req 'minlong)
                              (params req 'minlat)
                              (params req 'maxlong)
                              (params req 'maxlat))
                      (pict->bitmap
-                       (plot-trenches (trenches (string->number (params req 'minlong))
-                                                (string->number (params req 'minlat))
-                                                (string->number (params req 'maxlong))
-                                                (string->number (params req 'maxlat))))))))
+                       (scale (plot-trenches (trenches (string->number (params req 'minlong))
+                                                       (string->number (params req 'minlat))
+                                                       (string->number (params req 'maxlong))
+                                                       (string->number (params req 'maxlat))))
+                              scale-factor)))))
     (run)))
 
 ;; Entry point:
