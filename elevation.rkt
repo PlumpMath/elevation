@@ -1,7 +1,10 @@
+#!/usr/bin/env racket
+
 #lang racket
 
 (provide SRTM-inside
-         elevation-service-start)
+         elevation-service-start
+         SRTM->n-triples-file)
 
 (require pict)
 (require json)
@@ -11,7 +14,7 @@
 (require web-server/servlet)
 (require (planet dmac/spin))
 (require muninn/utm)
-(require muninn/trenches)
+(require "bbox.rkt")
 
 ;; (: data-dir String)
 (define data-dir
@@ -112,6 +115,19 @@
                                    " "
                                    new-file-name)))
       (printf "Saved \"~a\".~n" new-file-name)
+      new-file-name)))
+
+;; (: SRTM->n-triples-file (-> SRTM String))
+(define (SRTM->n-triples-file srtm)
+  (let ([xyz-file-name (SRTM->xyz-file srtm)]
+        [new-file-name (uid)])
+    (begin
+      (time (system (string-append "cat "
+                                   xyz-file-name
+                                   " | "
+                                   "serialize.rb"
+                                   " > "
+                                   new-file-name)))
       new-file-name)))
 
 ;; (: SRTM-utm-project (-> SRTM SRTM))
@@ -221,6 +237,11 @@
   (let ([srtms (filter (SRTM-intersects? min-long min-lat max-long max-lat) SRTMs)])
     (SRTM-intersection srtms min-long min-lat max-long max-lat)))
 
+;; (: req->SRTM-inside (-> Request SRTM))
+(define (req->SRTM-inside req)
+  (apply SRTM-inside
+         (vector->list (string->bbox (params req 'bbox)))))
+
 ;; (: elevation-service-start (-> Void))
 (define (elevation-service-start)
   (define (file-response-maker mime-type)
@@ -264,6 +285,11 @@
                                 (string->number (params req 'maxlong))
                                 (string->number (params req 'maxlat)))))
               #"text/plain")
+    (file-get "/n-triples"
+              (λ (req)
+                 (SRTM->n-triples-file
+                   (req->SRTM-inside req)))
+              #"text/plain")
     (file-get "/utm"
               (λ (req)
                  (SRTM->png-file
@@ -273,20 +299,6 @@
                                   (string->number (params req 'maxlong))
                                   (string->number (params req 'maxlat))))))
               #"image/png")
-    (bitmap-get "/utm/trenches"
-                (λ (req)
-                   (begin
-                     (printf "~nRequesting trench data in (~a,~a,~a,~a)~n"
-                             (params req 'minlong)
-                             (params req 'minlat)
-                             (params req 'maxlong)
-                             (params req 'maxlat))
-                     (pict->bitmap
-                       (scale (plot-trenches (trenches (string->number (params req 'minlong))
-                                                       (string->number (params req 'minlat))
-                                                       (string->number (params req 'maxlong))
-                                                       (string->number (params req 'maxlat))))
-                              scale-factor)))))
     (run)))
 
 ;; Entry point:
