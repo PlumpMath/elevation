@@ -1,9 +1,6 @@
-#!/usr/bin/env racket
-
 #lang racket
 
 (provide SRTM-inside
-         elevation-service-start
          SRTM->n-triples-file)
 
 (require pict)
@@ -14,7 +11,6 @@
 (require web-server/servlet)
 (require (planet dmac/spin))
 (require muninn/utm)
-(require "bbox.rkt")
 
 ;; (: data-dir String)
 (define data-dir
@@ -236,73 +232,3 @@
 (define (SRTM-inside min-long min-lat max-long max-lat)
   (let ([srtms (filter (SRTM-intersects? min-long min-lat max-long max-lat) SRTMs)])
     (SRTM-intersection srtms min-long min-lat max-long max-lat)))
-
-;; (: req->SRTM-inside (-> Request SRTM))
-(define (req->SRTM-inside req)
-  (apply SRTM-inside
-         (vector->list (string->bbox (params req 'bbox)))))
-
-;; (: elevation-service-start (-> Void))
-(define (elevation-service-start)
-  (define (file-response-maker mime-type)
-    (λ (status headers body)
-       (response status
-                 (status->message status)
-                 (current-seconds)
-                 mime-type
-                 headers
-                 (λ (op)
-                    (begin
-                      (with-input-from-file body
-                                            (λ () (copy-port (current-input-port) op)))
-                      (void))))))
-  (define (file-get path handler mime-type)
-    (define-handler "GET" path handler (file-response-maker mime-type)))
-  (define (bitmap-response-maker status headers body)
-    (response status
-              (status->message status)
-              (current-seconds)
-              #"image/png"
-              headers
-              (λ (op)
-                 (write-bytes (convert body 'png-bytes) op))))
-  (define (bitmap-get path handler)
-    (define-handler "GET" path handler bitmap-response-maker))
-  (begin
-    (file-get "/"
-              (λ (req)
-                 (SRTM->png-file
-                   (SRTM-inside (string->number (params req 'minlong))
-                                (string->number (params req 'minlat))
-                                (string->number (params req 'maxlong))
-                                (string->number (params req 'maxlat)))))
-              #"image/png")
-    (file-get "/xyz"
-              (λ (req)
-                 (SRTM->xyz-file
-                   (SRTM-inside (string->number (params req 'minlong))
-                                (string->number (params req 'minlat))
-                                (string->number (params req 'maxlong))
-                                (string->number (params req 'maxlat)))))
-              #"text/plain")
-    (file-get "/n-triples"
-              (λ (req)
-                 (SRTM->n-triples-file
-                   (req->SRTM-inside req)))
-              #"text/plain")
-    (file-get "/utm"
-              (λ (req)
-                 (SRTM->png-file
-                   (SRTM-utm-project
-                     (SRTM-inside (string->number (params req 'minlong))
-                                  (string->number (params req 'minlat))
-                                  (string->number (params req 'maxlong))
-                                  (string->number (params req 'maxlat))))))
-              #"image/png")
-    (run)))
-
-;; Entry point:
-;; $ racket elevation.rkt
-(module+ main
-  (elevation-service-start))
-

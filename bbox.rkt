@@ -2,7 +2,7 @@
 
 (provide string->bbox)
 
-;; (: string->bbox (-> String (Vector Number Number Number Number)))
+;; (: string->bbox (-> String (U (Vector Number Number Number Number) False)))
 (define (string->bbox str)
   (match
     (regexp-match
@@ -13,4 +13,4 @@
              (string->number min-lat)
              (string->number max-long)
              (string->number max-lat))]
-    [#f (vector 0.0 0.0 0.0 0.0)]))
+    [#f #f]))
