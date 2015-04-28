@@ -2,7 +2,6 @@
 
 #lang racket
 
-(require "bbox.rkt")
 (require "elevation.rkt")
 
 ;; (: log-file String)
@@ -16,6 +15,19 @@
            (flatten (map (λ (str)
                             (string-split str "="))
                          (string-split (getenv "QUERY_STRING") "&"))))))
+
+;; (: string->bbox (-> String (U (Vector Number Number Number Number) False)))
+(define (string->bbox str)
+  (match
+    (regexp-match
+      #rx"^(\\-?[0-9]+\\.?[0-9]*),[ ]?([0-9]+\\.?[0-9]*),[ ]?([0-9]+\\.?[0-9]*),[ ]?([0-9]+\\.?[0-9]*)$"
+      str)
+    [(list _ min-long min-lat max-long max-lat)
+     (vector (string->number min-long)
+             (string->number min-lat)
+             (string->number max-long)
+             (string->number max-lat))]
+    [#f #f]))
 
 (define (check-bbox request-bbox)
   (cond [(and (vector? request-bbox)
@@ -52,15 +64,6 @@
            request-format)]
         [else request-format]))
 
-(define (check-proj request-proj)
-  (cond [(and (not (equal? request-proj "utm"))
-              (not (equal? request-proj "wgs84")))
-         (raise-argument-error
-           'check-proj
-           "(U \"utm\" \"wgs84\")"
-           request-proj)]
-        [else request-proj]))
-
 (define (mime-type request-format)
   (cond [(equal? request-format "rdf/xml")
          "application/rdf+xml"]
@@ -79,22 +82,18 @@
       (λ () (copy-port (current-input-port)
                        (current-output-port)))))
 
-(define (request-file request-format request-bbox request-proj)
-  (let* ([srtm-inside (apply SRTM-inside (vector->list request-bbox))]
-         [srtm-inside-projected
-           (cond [(equal? request-proj "utm")
-                  (SRTM-utm-project srtm-inside)]
-                 [else srtm-inside])])
+(define (request-file request-format request-bbox)
+  (let ([srtm-inside (apply SRTM-inside (vector->list request-bbox))])
     (cond [(equal? request-format "rdf/xml")
-           (SRTM->rdf-xml-file srtm-inside-projected)]
+           (SRTM->rdf-xml-file srtm-inside)]
           [(equal? request-format "n3")
-           (SRTM->n3-file srtm-inside-projected)]
+           (SRTM->n3-file srtm-inside)]
           [(equal? request-format "ntriples")
-           (SRTM->n-triples-file srtm-inside-projected)]
+           (SRTM->n-triples-file srtm-inside)]
           [(equal? request-format "xyz")
-           (SRTM->xyz-file srtm-inside-projected)]
+           (SRTM->xyz-file srtm-inside)]
           [(equal? request-format "png")
-           (SRTM->png-file srtm-inside-projected)])))
+           (SRTM->png-file srtm-inside)])))
 
 (module+ main
   (with-handlers
@@ -103,15 +102,13 @@
           (printf "Status: 406 Not Acceptable~n~n~a~n" exn)))]
     (let* ([request-bbox (string->bbox (hash-ref request-params "bbox"))]
            [request-format (hash-ref request-params "format")]
-           [request-proj (hash-ref request-params "proj")]
            [request-file
              (with-output-to-file
                log-file #:exists 'append
-               (λ () (request-file request-format request-bbox request-proj)))])
+               (λ () (request-file request-format request-bbox)))])
       (begin
         (check-bbox request-bbox)
         (check-format request-format)
-        (check-proj request-proj)
         (printf "Status: 200 OK~n")
         (printf "Content-Type: ~a~n~n" (mime-type request-format))
         (print-body request-file)
