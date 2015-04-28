@@ -1,7 +1,12 @@
 #lang racket
 
 (provide SRTM-inside
-         SRTM->n-triples-file)
+         SRTM->n-triples-file
+         SRTM->n3-file
+         SRTM->rdf-xml-file
+         SRTM->xyz-file
+         SRTM->png-file
+         SRTM-utm-project)
 
 (require pict)
 (require json)
@@ -27,6 +32,9 @@
 
 ;; (: utm-scale-y Real)
 (define utm-scale-y (/ -1.0 scale-factor))
+
+;; (: dataset-uri String)
+(define dataset-uri "http://localhost/datasets/srtm")
 
 ;; (: SRTM String Real Real Real Real)
 (struct SRTM (file-name min-long min-lat max-long max-lat) #:transparent)
@@ -95,6 +103,9 @@
                                    " "
                                    new-file-name)))
       (printf "Saved \"~a\".~n" new-file-name)
+      (time (system (string-append "rm -f "
+                                   (SRTM-file-name srtm))))
+      (printf "Removed \"~a\".~n" (SRTM-file-name srtm))
       new-file-name)))
 
 ;; (: SRTM->xyz-file (-> SRTM String))
@@ -111,6 +122,9 @@
                                    " "
                                    new-file-name)))
       (printf "Saved \"~a\".~n" new-file-name)
+      (time (system (string-append "rm -f "
+                                   (SRTM-file-name srtm))))
+      (printf "Removed \"~a\".~n" (SRTM-file-name srtm))
       new-file-name)))
 
 ;; (: SRTM->n-triples-file (-> SRTM String))
@@ -118,12 +132,62 @@
   (let ([xyz-file-name (SRTM->xyz-file srtm)]
         [new-file-name (uid)])
     (begin
+      (printf "Translating XYZ file to N-triples.")
       (time (system (string-append "cat "
                                    xyz-file-name
                                    " | "
-                                   "serialize.rb"
+                                   "serialize.rb "
+                                   "ntriples"
+                                   " "
+                                   dataset-uri
                                    " > "
                                    new-file-name)))
+      (printf "Saved \"~a\".~n" new-file-name)
+      (time (system (string-append "rm -f "
+                                   xyz-file-name)))
+      (printf "Removed \"~a\".~n" xyz-file-name)
+      new-file-name)))
+
+;; (: SRTM->n3-file (-> SRTM String))
+(define (SRTM->n3-file srtm)
+  (let ([xyz-file-name (SRTM->xyz-file srtm)]
+        [new-file-name (uid)])
+    (begin
+      (printf "Translating XYZ file to N3.")
+      (time (system (string-append "cat "
+                                   xyz-file-name
+                                   " | "
+                                   "serialize.rb "
+                                   "n3"
+                                   " "
+                                   dataset-uri
+                                   " > "
+                                   new-file-name)))
+      (printf "Saved \"~a\".~n" new-file-name)
+      (time (system (string-append "rm -f "
+                                   xyz-file-name)))
+      (printf "Removed \"~a\".~n" xyz-file-name)
+      new-file-name)))
+
+;; (: SRTM->rdf-xml-file (-> SRTM String))
+(define (SRTM->rdf-xml-file srtm)
+  (let ([xyz-file-name (SRTM->xyz-file srtm)]
+        [new-file-name (uid)])
+    (begin
+      (printf "Translating XYZ file to RDF/XML.")
+      (time (system (string-append "cat "
+                                   xyz-file-name
+                                   " | "
+                                   "serialize.rb "
+                                   "rdfxml"
+                                   " "
+                                   dataset-uri
+                                   " > "
+                                   new-file-name)))
+      (printf "Saved \"~a\".~n" new-file-name)
+      (time (system (string-append "rm -f "
+                                   xyz-file-name)))
+      (printf "Removed \"~a\".~n" xyz-file-name)
       new-file-name)))
 
 ;; (: SRTM-utm-project (-> SRTM SRTM))
@@ -172,6 +236,9 @@
                                    " "
                                    "-r bilinear")))
       (printf "Saved \"~a\".~n" new-file-name)
+      (time (system (string-append "rm -f "
+                                   (SRTM-file-name srtm))))
+      (printf "Removed \"~a\".~n" (SRTM-file-name srtm))
       (SRTM new-file-name utm-min-x utm-min-y utm-max-x utm-max-y))))
 
 ;; (: SRTM-intersection (-> (Listof SRTM) Real Real Real Real SRTM))
@@ -226,6 +293,9 @@
                                    " "
                                    file-name-cropped)))
       (printf "Saved \"~a\".~n" file-name-cropped)
+      (time (system (string-append "rm -f "
+                                   file-name-merged)))
+      (printf "Removed \"~a\".~n" file-name-merged)
       (SRTM file-name-cropped min-long min-lat max-long max-lat))))
 
 ;; (: SRTM-inside (-> Real Real Real Real SRTM))

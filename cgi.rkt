@@ -5,6 +5,9 @@
 (require "bbox.rkt")
 (require "elevation.rkt")
 
+;; (: log-file String)
+(define log-file "log.txt")
+
 ;; (: request-params (HashTable String String))
 (define request-params
   (with-handlers
@@ -58,36 +61,64 @@
            request-proj)]
         [else request-proj]))
 
-(define (check-scale request-scale)
-  (cond [(or (not (number? request-scale))
-             (> request-scale 90)
-             (< request-scale 1))
-         (raise-argument-error
-           'check-scale
-           "(Range 1 90)"
-           request-scale)]
-        [else request-scale]))
+(define (mime-type request-format)
+  (cond [(equal? request-format "rdf/xml")
+         "application/rdf+xml"]
+        [(equal? request-format "n3")
+         "text/rdf+n3"]
+        [(equal? request-format "ntriples")
+         "text/plain"]
+        [(equal? request-format "xyz")
+         "text/plain"]
+        [(equal? request-format "png")
+         "image/png"]))
 
-(define (print-body request-bbox)
+(define (print-body request-file)
   (with-input-from-file
-      (SRTM->n-triples-file
-        (apply SRTM-inside (vector->list request-bbox)))
+      request-file
       (λ () (copy-port (current-input-port)
                        (current-output-port)))))
+
+(define (request-file request-format request-bbox request-proj)
+  (let* ([srtm-inside (apply SRTM-inside (vector->list request-bbox))]
+         [srtm-inside-projected
+           (cond [(equal? request-proj "utm")
+                  (SRTM-utm-project srtm-inside)]
+                 [else srtm-inside])])
+    (cond [(equal? request-format "rdf/xml")
+           (SRTM->rdf-xml-file srtm-inside-projected)]
+          [(equal? request-format "n3")
+           (SRTM->n3-file srtm-inside-projected)]
+          [(equal? request-format "ntriples")
+           (SRTM->n-triples-file srtm-inside-projected)]
+          [(equal? request-format "xyz")
+           (SRTM->xyz-file srtm-inside-projected)]
+          [(equal? request-format "png")
+           (SRTM->png-file srtm-inside-projected)])))
 
 (module+ main
   (with-handlers
     [(exn:fail:contract?
        (λ (exn)
           (printf "Status: 406 Not Acceptable~n~n~a~n" exn)))]
-    (let ([request-bbox (string->bbox (hash-ref request-params "bbox"))]
-          [request-format (hash-ref request-params "format")]
-          [request-scale (string->number (hash-ref request-params "scale"))]
-          [request-proj (hash-ref request-params "proj")])
+    (let* ([request-bbox (string->bbox (hash-ref request-params "bbox"))]
+           [request-format (hash-ref request-params "format")]
+           [request-proj (hash-ref request-params "proj")]
+           [request-file
+             (with-output-to-file
+               log-file #:exists 'append
+               (λ () (request-file request-format request-bbox request-proj)))])
       (begin
         (check-bbox request-bbox)
         (check-format request-format)
-        (check-scale request-scale)
         (check-proj request-proj)
-        (printf "Content-Type: text/plain~n~n")
-        (print-body request-bbox)))))
+        (printf "Status: 200 OK~n")
+        (printf "Content-Type: ~a~n~n" (mime-type request-format))
+        (print-body request-file)
+        (with-output-to-file
+          log-file #:exists 'append
+          (λ ()
+             (begin
+               (time (system (string-append "rm -f " request-file)))
+               (printf "Removed \"~a\".~n" request-file)
+               (printf "Done request.~n"))))))))
