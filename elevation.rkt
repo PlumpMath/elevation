@@ -34,7 +34,9 @@
 (define utm-scale-y (/ -1.0 scale-factor))
 
 ;; (: dataset-uri String)
-(define dataset-uri "http://localhost/datasets/srtm")
+(define dataset-uri
+  (string-append (getenv "HTTP_HOST")
+                 "/datasets/srtm"))
 
 ;; (: SRTM String Real Real Real Real)
 (struct SRTM (file-name min-long min-lat max-long max-lat) #:transparent)
