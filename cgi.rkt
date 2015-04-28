@@ -64,6 +64,16 @@
            request-format)]
         [else request-format]))
 
+(define (check-scale request-scale)
+  (cond [(or (not (number? request-scale))
+             (> request-scale 90)
+             (< request-scale 1))
+         (raise-argument-error
+           'check-scale
+           "(Range 1 90)"
+           request-scale)]
+        [else request-scale]))
+
 (define (mime-type request-format)
   (cond [(equal? request-format "rdf/xml")
          "application/rdf+xml"]
@@ -82,8 +92,14 @@
       (λ () (copy-port (current-input-port)
                        (current-output-port)))))
 
-(define (request-file request-format request-bbox)
-  (let ([srtm-inside (apply SRTM-inside (vector->list request-bbox))])
+(define (request-file request-format request-bbox request-scale)
+  (let ([srtm-inside
+          (SRTM-inside
+            (vector-ref request-bbox 0)
+            (vector-ref request-bbox 1)
+            (vector-ref request-bbox 2)
+            (vector-ref request-bbox 3)
+            request-scale)])
     (cond [(equal? request-format "rdf/xml")
            (SRTM->rdf-xml-file srtm-inside)]
           [(equal? request-format "n3")
@@ -100,15 +116,14 @@
     [(exn:fail:contract?
        (λ (exn)
           (printf "Status: 406 Not Acceptable~n~n~a~n" exn)))]
-    (let* ([request-bbox (string->bbox (hash-ref request-params "bbox"))]
-           [request-format (hash-ref request-params "format")]
+    (let* ([request-bbox (check-bbox (string->bbox (hash-ref request-params "bbox")))]
+           [request-format (check-format (hash-ref request-params "format"))]
+           [request-scale (check-scale (string->number (hash-ref request-params "scale")))]
            [request-file
              (with-output-to-file
                log-file #:exists 'append
-               (λ () (request-file request-format request-bbox)))])
+               (λ () (request-file request-format request-bbox request-scale)))])
       (begin
-        (check-bbox request-bbox)
-        (check-format request-format)
         (printf "Status: 200 OK~n")
         (printf "Content-Type: ~a~n~n" (mime-type request-format))
         (print-body request-file)

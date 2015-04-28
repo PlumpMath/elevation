@@ -241,8 +241,15 @@
       (printf "Removed \"~a\".~n" (SRTM-file-name srtm))
       (SRTM new-file-name utm-min-x utm-min-y utm-max-x utm-max-y))))
 
-;; (: SRTM-intersection (-> (Listof SRTM) Real Real Real Real SRTM))
-(define (SRTM-intersection srtms min-long min-lat max-long max-lat)
+;; (: distance->degrees (-> Real Real))
+(define (distance->degrees distance)
+  (let ([pi 3.14159]
+        [conversion 180.0]
+        [radius 6378137.0])
+  (/ distance (* (/  pi conversion) radius))))
+
+;; (: SRTM-intersection (-> (Listof SRTM) Real Real Real Real Real SRTM))
+(define (SRTM-intersection srtms min-long min-lat max-long max-lat distance-scale)
   (let* ([file-name-merged (uid)]
          [file-name-cropped (uid)]
          [interpolation-method "bilinear"])
@@ -289,6 +296,12 @@
                                    " "
                                    (number->string max-lat)
                                    " "
+                                   "-tr"
+                                   " "
+                                   (number->string (distance->degrees distance-scale))
+                                   " "
+                                   (number->string (* (distance->degrees distance-scale) -1.0))
+                                   " "
                                    file-name-merged
                                    " "
                                    file-name-cropped)))
@@ -299,6 +312,6 @@
       (SRTM file-name-cropped min-long min-lat max-long max-lat))))
 
 ;; (: SRTM-inside (-> Real Real Real Real SRTM))
-(define (SRTM-inside min-long min-lat max-long max-lat)
+(define (SRTM-inside min-long min-lat max-long max-lat distance-scale)
   (let ([srtms (filter (SRTM-intersects? min-long min-lat max-long max-lat) SRTMs)])
-    (SRTM-intersection srtms min-long min-lat max-long max-lat)))
+    (SRTM-intersection srtms min-long min-lat max-long max-lat distance-scale)))

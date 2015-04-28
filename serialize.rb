@@ -8,7 +8,9 @@ require 'rdf/raptor'
 
 md5 = Digest::MD5.new
 
-rdf_format, dataset_uri = ARGV
+rdf_format, dataset_uri_string = ARGV
+
+dataset_uri = RDF::URI(dataset_uri_string)
 
 STDIN.each_line { |line|
 
