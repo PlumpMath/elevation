@@ -13,8 +13,6 @@
 (require net/url)
 (require file/unzip)
 (require file/convertible)
-(require web-server/servlet)
-(require (planet dmac/spin))
 (require muninn/utm)
 
 ;; (: data-dir String)
