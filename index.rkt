@@ -5,7 +5,7 @@
 (require "elevation.rkt")
 
 ;; (: log-file String)
-(define log-file "log.txt")
+(define log-file "/tmp/elevation-log.txt")
 
 ;; (: request-params (HashTable String String))
 (define request-params
