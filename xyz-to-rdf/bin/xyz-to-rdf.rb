@@ -14,6 +14,11 @@ md5 = Digest::MD5.new
 rdf_format, dataset_uri_string = ARGV
 
 dataset_uri = RDF::URI(dataset_uri_string)
+geo_point_uri = RDF::URI("http://www.w3.org/2003/01/geo/wgs84_pos#Point")
+geo_long_uri  = RDF::URI("http://www.w3.org/2003/01/geo/wgs84_pos#long")
+geo_lat_uri   = RDF::URI("http://www.w3.org/2003/01/geo/wgs84_pos#lat")
+geo_alt_uri   = RDF::URI("http://www.w3.org/2003/01/geo/wgs84_pos#alt")
+prov_was_informed_by_uri = RDF::URI("http://www.w3.org/ns/prov#wasInformedBy")
 
 output = RDF::Writer.for(rdf_format.to_sym).buffer { |writer|
 
@@ -23,12 +28,6 @@ output = RDF::Writer.for(rdf_format.to_sym).buffer { |writer|
   STDIN.each_line { |line|
 
     geo_long, geo_lat, geo_alt = line.split(" ")
-
-    geo_point_uri = RDF::URI("http://www.w3.org/2003/01/geo/wgs84_pos#Point")
-    geo_long_uri  = RDF::URI("http://www.w3.org/2003/01/geo/wgs84_pos#long")
-    geo_lat_uri   = RDF::URI("http://www.w3.org/2003/01/geo/wgs84_pos#lat")
-    geo_alt_uri   = RDF::URI("http://www.w3.org/2003/01/geo/wgs84_pos#alt")
-    prov_was_informed_by_uri = RDF::URI("http://www.w3.org/ns/prov#wasInformedBy")
 
     md5 << "%geo_long_url %geo_lat_url %geo_alt_uri"
     subject = RDF::Node.new(md5.hexdigest)
