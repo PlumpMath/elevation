@@ -7,7 +7,7 @@ require 'digest/md5'
 require 'rdf'
 require 'rdf/ntriples'
 require 'rdf/n3'
-require 'rdf/raptor'
+require 'rdf/rdfxml'
 
 md5 = Digest::MD5.new
 
