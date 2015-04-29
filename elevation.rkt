@@ -84,7 +84,7 @@
          (system (string-append "cp -f "
                                 geotiff
                                 data-dir)))))
-  (let* ([url-path (string-append dataset-uri (SRTM-file-name srtm) ".zip")]
+  (let* ([url-path (string-append dataset-uri "/" (SRTM-file-name srtm) ".zip")]
          [url (string->url url-path)]
          [geotiff-copy (make-geotiff-copy srtm)])
     (call-with-unzip (get-pure-port url #:redirections 1)
