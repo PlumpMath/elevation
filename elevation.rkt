@@ -17,7 +17,7 @@
 
 ;; (: data-dir String)
 (define data-dir
-  (let ([path "/tmp/data/"])
+  (let ([path "/tmp/"])
     (begin
       (system (string-append  "mkdir -p " path))
       path)))
