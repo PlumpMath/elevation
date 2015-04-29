@@ -17,6 +17,9 @@ dataset_uri = RDF::URI(dataset_uri_string)
 
 output = RDF::Writer.for(rdf_format.to_sym).buffer { |writer|
 
+  writer.prefix(:geo, RDF::URI("http://www.w3.org/2003/01/geo/wgs84_pos#"))
+  writer.prefix(:prov, RDF::URI("http://www.w3.org/ns/prov#"))
+
   STDIN.each_line { |line|
 
     geo_long, geo_lat, geo_alt = line.split(" ")
