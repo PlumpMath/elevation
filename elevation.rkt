@@ -34,9 +34,7 @@
 (define utm-scale-y (/ -1.0 scale-factor))
 
 ;; (: dataset-uri String)
-(define dataset-uri
-  (string-append (getenv "HTTP_HOST")
-                 "/datasets/srtm"))
+(define dataset-uri "http://rdf.muninn-project.org/api/elevation/datasets/srtm")
 
 ;; (: SRTM String Real Real Real Real)
 (struct SRTM (file-name min-long min-lat max-long max-lat) #:transparent)
@@ -86,8 +84,7 @@
          (system (string-append "cp -f "
                                 geotiff
                                 data-dir)))))
-  (let* ([url-prefix "http://gis-lab.info/data/srtm-tif/"]
-         [url-path (string-append url-prefix (SRTM-file-name srtm) ".zip")]
+  (let* ([url-path (string-append dataset-uri (SRTM-file-name srtm) ".zip")]
          [url (string->url url-path)]
          [geotiff-copy (make-geotiff-copy srtm)])
     (call-with-unzip (get-pure-port url #:redirections 1)
