@@ -6,7 +6,8 @@ Gem::Specification.new do |s|
   s.description = "xyz-to-rdf"
   s.authors     = ["Mark Farrell"]
   s.email       = 'm4farrel@uwaterloo.ca'
-  s.files       = ["xyz-to-rdf.rb"]
+  s.files       = ["bin/xyz-to-rdf.rb"]
   s.homepage    = ''
   s.license     = 'MIT'
+  s.executables = ["xyz-to-rdf.rb"]
 end
