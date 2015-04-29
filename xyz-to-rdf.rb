@@ -1,5 +1,8 @@
 #!/usr/bin/env ruby
 
+require 'rubygems'
+require 'bundler/setup'
+
 require 'digest/md5'
 require 'rdf'
 require 'rdf/ntriples'

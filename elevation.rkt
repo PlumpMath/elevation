@@ -138,7 +138,7 @@
       (time (system (string-append "cat "
                                    xyz-file-name
                                    " | "
-                                   "serialize.rb "
+                                   "xyz-to-rdf.rb "
                                    "ntriples"
                                    " "
                                    dataset-uri
@@ -159,7 +159,7 @@
       (time (system (string-append "cat "
                                    xyz-file-name
                                    " | "
-                                   "serialize.rb "
+                                   "xyz-to-rdf.rb "
                                    "n3"
                                    " "
                                    dataset-uri
@@ -180,7 +180,7 @@
       (time (system (string-append "cat "
                                    xyz-file-name
                                    " | "
-                                   "serialize.rb "
+                                   "xyz-to-rdf.rb "
                                    "rdfxml"
                                    " "
                                    dataset-uri

@@ -1,0 +1,20 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    ffi (1.9.8)
+    link_header (0.0.8)
+    rdf (1.1.11)
+      link_header (~> 0.0, >= 0.0.8)
+    rdf-n3 (1.1.3)
+      rdf (~> 1.1, >= 1.1.5)
+    rdf-raptor (1.2.1)
+      ffi (>= 1.9.3)
+      rdf (>= 1.1.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  rdf
+  rdf-n3
+  rdf-raptor
